@@ -61,6 +61,15 @@ when creating PhyNodes:
   end
 end
 
+function Base.show(io::IO, n::PhyNode)
+  if isempty(n.children)
+    print(io, n.name)
+  else
+    print(io, "(")
+    print(io, join(map(string, n.children), ","))
+    print(io, ")")
+  end
+end
 
 @Docile.doc """
 Test whether the branchlength in the node is known (i.e. is not -1.0).
