@@ -8,6 +8,10 @@ module Phylo
 
 using Docile
 
+using Colors
+
+using Compose
+
 using Base.Intrinsics
 
 using LightXML: XMLElement, get_elements_by_tagname, attribute
@@ -33,7 +37,7 @@ export
   # Phylogeny and associated methods
   Phylogeny, isrooted, isrerootable, root!,
   setrerootable!, graft!, prune!, pruneregraft!, search,
-  searchall, generateindex,
+  searchall, generateindex, phyplot,
 
   # PhylogenyIterator and associated methods
   PhylogenyIterator, DepthFirst, BreadthFirst, Tip2Root,
@@ -47,5 +51,6 @@ include("phylogeny.jl")
 include("treeio.jl")
 include("iteration.jl")
 include("annotation.jl")
+include("phyplot.jl")
 
 end # module Phylo
