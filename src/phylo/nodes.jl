@@ -10,15 +10,10 @@ PhyNode represents a node in a phylogenetic tree.
 
 A node can have:
 
-- `name`
-- `branchlength`
 - a reference to its `parent` PhyNode
 - reference to one or more `children`
 """
 type PhyNode
-    name::String
-    branchlength::Nullable{Float64}
-    confidence::Nullable{Float64}
     children::Vector{PhyNode}
     parent::PhyNode
     """
@@ -28,35 +23,18 @@ type PhyNode
 
     **Example:**
     one = PhyNode()
-    two = PhyNode(name = "two", branchlength = 1.0, parent = one)
+    two = PhyNode(parent = one)
 
     **Parameters:**
-    * `name`:         The name of the node (optional). Defaults to an empty string, indicating
-                      the node has no name.
-
-    * `branchlength`: The branch length of the node from its parent (optional).
-                      Because branch lengths can be not applicable (cladograms), or not known.
-                      The value is Nullable, and is null by default.
-
-    * `confidence`:   A Nullable Floating point value that can represent confidence for that clade (optional).
-                      Such confidences are usually Maximum Likelihood values or Bootstrap
-                      values.
-
     * `children`:     A Vector containing references to the PhyNodes that are children of this node (optional).
                       Default to an empty vector.
 
     * `parent`:       The parent node (optional). Defaults to a self-reference, indicating
                       the node has no parent.
 """
-    function PhyNode(name::String = "",
-                     branchlength::Nullable{Float64} = Nullable{Float64}(),
-                     confidence::Nullable{Float64} = Nullable{Float64}(),
-                     children::Vector{PhyNode} = PhyNode[],
+    function PhyNode(children::Vector{PhyNode} = PhyNode[],
                      parent = nothing)
         x = new()
-        name!(x, name)
-        branchlength!(x, branchlength)
-        confidence!(x, confidence)
         if parent != nothing
             graft!(parent, x)
         else
@@ -100,10 +78,7 @@ two = PhyNode(name = "two", branchlength = 1.0, parent = one)
 * `parent`:       The parent node (optional). Defaults to a self-reference, indicating
                   the node has no parent.
 """
-function PhyNode(name::String = "",
-                 branchlength::Float64 = -1.0,
-                 confidence::Float64 = -1.0,
-                 children::Vector{PhyNode} = PhyNode[],
+function PhyNode(children::Vector{PhyNode} = PhyNode[],
                  parent = nothing)
 
     bl = branchlength < 0 ? Nullable{Float64}() : Nullable{Float64}(branchlength)
@@ -122,7 +97,7 @@ Basic show method for a PhyNode.
 """
 function Base.show(io::IO, n::PhyNode)
     if isempty(n.children)
-        print(io, n.name)
+        print(io, "*")
     else
         print(io, "(")
         print(io, join(map(string, n.children), ","))

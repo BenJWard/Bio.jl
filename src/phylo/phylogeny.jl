@@ -1,3 +1,6 @@
+abstract Phylogeny
+
+
 """
 Phylogeny represents a phylogenetic tree.
 
@@ -8,14 +11,22 @@ A tree can have:
 - `rooted`
 - `rerootable`
 """
-type Phylogeny
+type PhyloStructure <: Phylogeny
     name::String
     root::PhyNode
     rooted::Bool
     rerootable::Bool
 
-    Phylogeny() = new("", PhyNode(), false, true)
+    PhyloStructure() = new("", PhyNode(), false, true)
 end
+
+type AnnotatedPhylogeny{T <: Phylogeny, K, D} <: Phylogeny
+    underlying::T
+    annotations::Dict{K, D}
+end
+
+
+
 
 
 """
