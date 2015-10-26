@@ -526,3 +526,36 @@ rather, this function simply alters the root field. Generally this should not be
 function root_unsafe!(tree::Phylogeny, node::PhyNode)
     tree.root = node
 end
+
+"""
+Ladderize a phylogeny, i.e. sort the descendants of all nodes by their size. This creates a prettier phylogeny for plotting. The nodes of the phylogeny themselves will be ladderized, also affecting other phylogenies in memory containing the same nodes. Note that this only works for rooted trees.
+
+**Parameters:**
+* `x`: The phylogeny to ladderize
+"""
+function ladderize!(x::Phylogeny)
+    function loc!(node::PhyNode)
+        if isleaf(node)
+            return 1
+        end
+
+        sizes = map(loc!, children(node))
+        node.children[:] = node.children[sortperm(sizes)]
+        sum(sizes) + 1
+    end
+
+    loc!(phy.root)
+    nothing
+end
+
+"""
+Create a ladderized copy of a phylogeny Note that this only works for rooted trees.
+
+**Parameters:**
+* `x`: The phylogeny to ladderize
+"""
+function ladderize(x::Phylogeny)
+    ret = deepcopy(x)
+    ladderize!(ret)
+    ret
+end

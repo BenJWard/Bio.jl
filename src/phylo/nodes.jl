@@ -615,7 +615,7 @@ end
 
 
 """
-Test whether two PhyNodes are equal. Specifically, test whether all three of `branchlength`, `name` and `extensions` are equal.
+Test whether two PhyNodes are equal. Implemented by testing for identity
 
 **Parameters:**
 
@@ -624,9 +624,7 @@ Test whether two PhyNodes are equal. Specifically, test whether all three of `br
 * `y`: The right PhyNode to compare.
 """
 function isequal(x::PhyNode, y::PhyNode)
-    bl = x.branchlength == y.branchlength
-    n = x.name == y.name
-    return all([bl, n])
+    return is(x, y)
 end
 
 
