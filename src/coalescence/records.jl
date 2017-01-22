@@ -6,20 +6,16 @@
 # This file is a part of BioJulia.
 # License is MIT: https://github.com/BioJulia/Bio.jl/blob/master/LICENSE.md
 
-
-# Types
-#------
-
 # So the basic idea here is to have a type representing a coalescence record,
 # and a type representing a collection of such coalescence records.
 
 immutable CoalescenceRecord
-    l          # Left boundary
-    r          # Right boundary
-    w          # Parent node
-    u          # Child node 1
-    v          # Child node 2
-    t          # Coalescence time
+    l::UInt          # Left boundary
+    r::UInt          # Right boundary
+    w::UInt          # Parent node
+    u::UInt          # Child node 1
+    v::UInt          # Child node 2
+    t::Float64       # Coalescence time
 end
 
 # An alternative implementation is to use the intervals from Bio.Intervals or
@@ -30,12 +26,12 @@ end
 # AbstractInterval.
 
 immutable CoalescenceRecordTable
-    l::Vector
-    r::Vector
-    w::Vector
-    u::Vector
-    v::Vector
-    t::Vector
+    l::Vector{UInt}
+    r::Vector{UInt}
+    w::Vector{UInt}
+    u::Vector{UInt}
+    v::Vector{UInt}
+    t::Vector{Float64}
 end
 
 
