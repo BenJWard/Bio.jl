@@ -8,7 +8,10 @@
 
 module Coalescence
 
+using HDF5
+
 include("records.jl")
+include("algorithm_t.jl")
 
 
 end
