@@ -10,6 +10,6 @@
 
 abstract AbstractTree
 
-immutable SparseTree
+immutable SparseTree <: AbstractTree
     data::Vector{UInt}
 end
