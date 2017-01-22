@@ -10,11 +10,17 @@
 
 module Evo
 
+using HDF5
 
+export CoalescenceRecord,
+    CRecord,
+    CoalescenceRecordTable,
+    CTable,
+    TreeSequence
 
+include("coalescence/records.jl")
 
-
-
-
+include("trees/trees.jl")
+include("trees/tree_seqs.jl")
 
 end
