@@ -10,7 +10,14 @@ module Coalescence
 
 using HDF5
 
+export CoalescenceRecord,
+    CRecord,
+    CoalescenceRecordTable,
+    CTable,
+    TreeSequence
+
 include("records.jl")
+include("tree_seqs.jl")
 include("algorithm_t.jl")
 
 

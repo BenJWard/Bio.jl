@@ -37,5 +37,5 @@ end
 
 
 # Just for conveinience typing/reading!
-typealias CRec CoalescenceRecord
+typealias CRecord CoalescenceRecord
 typealias CTable CoalescenceRecordTable
