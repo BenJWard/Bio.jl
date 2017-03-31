@@ -178,6 +178,7 @@ import BufferedStreams: BufferedStreams, BufferedInputStream, BufferedOutputStre
 import Combinatorics
 import IndexableBitVectors
 import Iterators
+import IntervalTrees: IntervalValue
 importall Bio
 
 """
