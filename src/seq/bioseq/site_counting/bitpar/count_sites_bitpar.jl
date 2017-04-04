@@ -1,7 +1,4 @@
 
-"""
-    count_sites_bitpar()
-"""
 @generated function count_sites_bitpar{T<:Site,A}(::Type{T}, a::BioSequence{A}, b::BioSequence{A})
     n = bitsof(A)
     if n == 2
@@ -14,14 +11,15 @@
 
     quote
         if length(a) > length(b)
-            return wee(b, a)
+            return count_sites_bitpar(T, b, a)
         end
         @assert length(a) ≤ length(b)
 
         nexta = bitindex(a, 1)
         nextb = bitindex(b, 1)
         stopa = bitindex(a, endof(a) + 1)
-        counts = 0
+        #counts = 0
+        counts = start_count(T)
 
         # align reading position of `a.data` so that `offset(nexta) == 0`
         if nexta < stopa && offset(nexta) != 0
@@ -37,7 +35,7 @@
             println("x: $(hex(x)), y: $(hex(y))")
             println("x masked: $(hex(x & m)), y masked: $(hex(y & m))")
             println("x type: $(typeof(x))")
-            counts += $count_func(T, x & m, y & m)
+            counts = update_count(countsm $count_func(T, x & m, y & m))
             nexta += k
             nextb += k
             println("Done initial alignment.")
@@ -52,7 +50,7 @@
                 y = b.data[index(nextb)]
                 println("x: $(hex(x))")
                 println("y: $(hex(y))")
-                counts += $count_func(T, x, y)
+                counts = update_count(counts, $count_func(T, x, y))
                 nexta += 64
                 nextb += 64
             end
@@ -68,7 +66,7 @@
                 println("m: $(hex(m))")
                 println("x masked: $(hex(x & m))")
                 println("y masked: $(hex(y & m))")
-                counts += $count_func(T, x & m, y & m)
+                counts = update_count(counts, $count_func(T, x & m, y & m))
                 println("Done aligned tail.")
             end
         elseif nexta < stopa
@@ -87,7 +85,7 @@
 
                 println("x: $(hex(x)), z: $(hex(z)), y: $(hex(y))")
                 println("x type: $(typeof(x))")
-                counts += $count_func(T, x, y)
+                counts = update_count(counts, $count_func(T, x, y))
                 y = z
                 nexta += 64
                 nextb += 64
@@ -107,7 +105,7 @@
                 m = mask(stopa - nexta)
                 println("x masked: $(hex(x & m)), y masked: $(hex(y & m))")
                 println("x type: $(typeof(x))")
-                counts += $count_func(T, x & m, y & m)
+                counts = update_count(counts, $count_func(T, x & m, y & m))
                 println("Done unaligned tail.")
             end
         end
