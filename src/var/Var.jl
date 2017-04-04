@@ -70,14 +70,17 @@ export
     genotype,
 
     MissingFieldException,
-    mashdistance
+    mashdistance,
+    fst
 
 # Bio.@reexport import Bio: isfilled, leftposition
 
 include("site_types.jl")
-#include("distances.jl")
+include("distances/distance_types.jl")
+include("distances/dist.jl")
 include("vcf/vcf.jl")
 include("bcf/bcf.jl")
 include("mash.jl")
+include("fst.jl")
 
 end # module Var

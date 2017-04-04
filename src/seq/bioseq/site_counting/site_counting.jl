@@ -9,6 +9,8 @@
 include("site_types.jl")
 include("count_sites_naive.jl")
 
+npairs(N::Int) = Int((N * (N - 1)) / 2)
+
 function Base.count{T<:Site}(::Type{T}, a::BioSequence)
     return count_sites_naieve(T, a)
 end
@@ -32,7 +34,7 @@ function Base.count{T<:Site}(::Type{T}, a::BioSequence, b::BioSequence, width::I
 end
 
 function count_pairwise{T<:Site,N}(::Type{T}, seqs::Vararg{BioSequence,N})
-    counts = Vector{out_type(T)}(Int((N * (N - 1)) / 2))
+    counts = Vector{out_type(T)}(npairs)
     c = 1
     @inbounds for i in 1:N, j in (i + 1):N
         counts[c] = count(T, seqs[i], seqs[j])
