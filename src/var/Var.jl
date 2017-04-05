@@ -22,6 +22,7 @@ import Bio.Seq:
     update_count,
     ispurine,
     ispyrimidine
+    BioSequence
 import PairwiseListMatrices: PairwiseListMatrix
 import Bio.Exceptions: MissingFieldException, missingerror
 import Bio.Windows: eachwindow, EachWindowIterator, SeqWinItr
