@@ -21,7 +21,7 @@ import Bio.Seq:
     out_type,
     update_count,
     ispurine,
-    ispyrimidine
+    ispyrimidine,
     BioSequence
 import PairwiseListMatrices: PairwiseListMatrix
 import Bio.Exceptions: MissingFieldException, missingerror
