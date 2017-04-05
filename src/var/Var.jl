@@ -77,7 +77,7 @@ export
 
 include("site_types.jl")
 #include("distances/distance_types.jl")
-include("distances/dist.jl")
+#include("distances/dist.jl")
 include("vcf/vcf.jl")
 include("bcf/bcf.jl")
 include("mash.jl")
