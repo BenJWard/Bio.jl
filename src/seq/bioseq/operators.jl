@@ -8,13 +8,19 @@ The first argument should be a function which accepts a nucleotide as its parame
 """
 function Base.count(f::Function, seq::BioSequence)
     n = 0
-    for x in seq
+    @inbounds for x in seq
         if f(x)
             n += 1
         end
     end
     return n
 end
+
+# Site counting
+# -------------
+
+include("site_counting/site_counting.jl")
+
 
 # Mismatch counting
 # -----------------
@@ -107,6 +113,7 @@ end
                 mismatches += $bitpar_mismatches(x & m, y & m)
             end
         elseif nexta < stopa
+
             y = b.data[index(nextb)]
             nextb += 64
 
@@ -298,7 +305,7 @@ end
 # ---------
 
 """
-    majorityvote{A<:NucleicAcidAlphabet}(seqs::AbstractVector{BioSequence{A}})
+    majorityvote{A<:NucleicAcidAlphabets}(seqs::AbstractVector{BioSequence{A}})
 
 Construct a sequence that is a consensus of a vector of sequences.
 
@@ -326,7 +333,7 @@ julia> majorityvote(seqs)
 MTCGAAARATCG
 ```
 """
-function majorityvote{A<:NucleicAcidAlphabet}(seqs::AbstractVector{BioSequence{A}})
+function majorityvote{A<:NucleicAcidAlphabets}(seqs::AbstractVector{BioSequence{A}})
     mat = seqmatrix(UInt8, seqs, :site)
     nsites = size(mat, 2)
     nseqs = size(mat, 1)

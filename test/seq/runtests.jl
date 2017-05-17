@@ -3,12 +3,15 @@ module TestSeq
 using Base.Test
 
 using Bio: Seq, Var
-
+import BioSymbols
+using IntervalTrees.IntervalValue
 using BufferedStreams
 using StatsBase
 using YAML
 using TestFunctions
+using PairwiseListMatrices
 
+typealias PWM PairwiseListMatrix
 
 const codons = [
         "AAA", "AAC", "AAG", "AAU",
@@ -108,253 +111,71 @@ function random_interval(minstart, maxstop)
     return start:rand(start:maxstop)
 end
 
-@testset "NucleicAcids" begin
-    @testset "Conversions" begin
-        @testset "UInt8" begin
-            @testset "DNA conversions from UInt8" begin
-                @test convert(DNA, 0b0000) === DNA_Gap
-                @test convert(DNA, 0b0001) === DNA_A
-                @test convert(DNA, 0b0010) === DNA_C
-                @test convert(DNA, 0b0011) === DNA_M
-                @test convert(DNA, 0b0100) === DNA_G
-                @test convert(DNA, 0b0101) === DNA_R
-                @test convert(DNA, 0b0110) === DNA_S
-                @test convert(DNA, 0b0111) === DNA_V
-                @test convert(DNA, 0b1000) === DNA_T
-                @test convert(DNA, 0b1001) === DNA_W
-                @test convert(DNA, 0b1010) === DNA_Y
-                @test convert(DNA, 0b1011) === DNA_H
-                @test convert(DNA, 0b1100) === DNA_K
-                @test convert(DNA, 0b1101) === DNA_D
-                @test convert(DNA, 0b1110) === DNA_B
-                @test convert(DNA, 0b1111) === DNA_N
-            end
+function generate_possibilities_tester{A<:Union{DNAAlphabet{4}, DNAAlphabet{2}, RNAAlphabet{4}, RNAAlphabet{2}}}(::Type{A})
+    symbols = alphabet(A)
+    arra = Vector{eltype(A)}()
+    arrb = Vector{eltype(A)}()
+    for i in 1:length(symbols), j in i:length(symbols)
+        push!(arra, symbols[i])
+        push!(arrb, symbols[j])
+    end
+    return BioSequence{A}(arra), BioSequence{A}(arrb)
+end
 
-            @testset "RNA conversions from UInt8" begin
-                @test convert(RNA, 0b0000) === RNA_Gap
-                @test convert(RNA, 0b0001) === RNA_A
-                @test convert(RNA, 0b0010) === RNA_C
-                @test convert(RNA, 0b0011) === RNA_M
-                @test convert(RNA, 0b0100) === RNA_G
-                @test convert(RNA, 0b0101) === RNA_R
-                @test convert(RNA, 0b0110) === RNA_S
-                @test convert(RNA, 0b0111) === RNA_V
-                @test convert(RNA, 0b1000) === RNA_U
-                @test convert(RNA, 0b1001) === RNA_W
-                @test convert(RNA, 0b1010) === RNA_Y
-                @test convert(RNA, 0b1011) === RNA_H
-                @test convert(RNA, 0b1100) === RNA_K
-                @test convert(RNA, 0b1101) === RNA_D
-                @test convert(RNA, 0b1110) === RNA_B
-                @test convert(RNA, 0b1111) === RNA_N
-            end
-
-            @testset "DNA conversions to UInt8" begin
-                @test convert(UInt8, DNA_Gap) === 0b0000
-                @test convert(UInt8, DNA_A)   === 0b0001
-                @test convert(UInt8, DNA_C)   === 0b0010
-                @test convert(UInt8, DNA_M)   === 0b0011
-                @test convert(UInt8, DNA_G)   === 0b0100
-                @test convert(UInt8, DNA_R)   === 0b0101
-                @test convert(UInt8, DNA_S)   === 0b0110
-                @test convert(UInt8, DNA_V)   === 0b0111
-                @test convert(UInt8, DNA_T)   === 0b1000
-                @test convert(UInt8, DNA_W)   === 0b1001
-                @test convert(UInt8, DNA_Y)   === 0b1010
-                @test convert(UInt8, DNA_H)   === 0b1011
-                @test convert(UInt8, DNA_K)   === 0b1100
-                @test convert(UInt8, DNA_D)   === 0b1101
-                @test convert(UInt8, DNA_B)   === 0b1110
-                @test convert(UInt8, DNA_N)   === 0b1111
-            end
-
-            @testset "RNA conversions to UInt8" begin
-                @test convert(UInt8, RNA_Gap) === 0b0000
-                @test convert(UInt8, RNA_A)   === 0b0001
-                @test convert(UInt8, RNA_C)   === 0b0010
-                @test convert(UInt8, RNA_M)   === 0b0011
-                @test convert(UInt8, RNA_G)   === 0b0100
-                @test convert(UInt8, RNA_R)   === 0b0101
-                @test convert(UInt8, RNA_S)   === 0b0110
-                @test convert(UInt8, RNA_V)   === 0b0111
-                @test convert(UInt8, RNA_U)   === 0b1000
-                @test convert(UInt8, RNA_W)   === 0b1001
-                @test convert(UInt8, RNA_Y)   === 0b1010
-                @test convert(UInt8, RNA_H)   === 0b1011
-                @test convert(UInt8, RNA_K)   === 0b1100
-                @test convert(UInt8, RNA_D)   === 0b1101
-                @test convert(UInt8, RNA_B)   === 0b1110
-                @test convert(UInt8, RNA_N)   === 0b1111
-            end
+for alph in (:DNAAlphabet, :RNAAlphabet)
+    @eval function generate_possibilities_tester(::Type{$alph{2}}, ::Type{$alph{4}})
+        arra = Vector{eltype($alph)}()
+        arrb = Vector{eltype($alph)}()
+        for i in alphabet($alph{2}), j in alphabet($alph{4})
+            push!(arra, i)
+            push!(arrb, j)
         end
+        return BioSequence{$alph{2}}(arra), BioSequence{$alph{4}}(arrb)
+    end
+end
 
-        @testset "UInt64" begin
-            @testset "DNA conversions from UInt64" begin
-                @test convert(DNA, UInt64(0b0000)) === DNA_Gap
-                @test convert(DNA, UInt64(0b0001)) === DNA_A
-                @test convert(DNA, UInt64(0b0010)) === DNA_C
-                @test convert(DNA, UInt64(0b0100)) === DNA_G
-                @test convert(DNA, UInt64(0b1000)) === DNA_T
-                @test convert(DNA, UInt64(0b1111)) === DNA_N
-            end
-
-            @testset "RNA conversions from UInt64" begin
-                @test convert(RNA, UInt64(0b0000)) === RNA_Gap
-                @test convert(RNA, UInt64(0b0001)) === RNA_A
-                @test convert(RNA, UInt64(0b0010)) === RNA_C
-                @test convert(RNA, UInt64(0b0100)) === RNA_G
-                @test convert(RNA, UInt64(0b1000)) === RNA_U
-                @test convert(RNA, UInt64(0b1111)) === RNA_N
-            end
-
-            @testset "DNA conversions to UInt64" begin
-                @test convert(UInt64, DNA_Gap) === UInt64(0b0000)
-                @test convert(UInt64, DNA_A)   === UInt64(0b0001)
-                @test convert(UInt64, DNA_C)   === UInt64(0b0010)
-                @test convert(UInt64, DNA_G)   === UInt64(0b0100)
-                @test convert(UInt64, DNA_T)   === UInt64(0b1000)
-                @test convert(UInt64, DNA_N)   === UInt64(0b1111)
-            end
-
-            @testset "RNA conversions to UInt64" begin
-                @test convert(UInt64, RNA_Gap) === UInt64(0b0000)
-                @test convert(UInt64, RNA_A)   === UInt64(0b0001)
-                @test convert(UInt64, RNA_C)   === UInt64(0b0010)
-                @test convert(UInt64, RNA_G)   === UInt64(0b0100)
-                @test convert(UInt64, RNA_U)   === UInt64(0b1000)
-                @test convert(UInt64, RNA_N)   === UInt64(0b1111)
-            end
-        end
-
-        @testset "Char" begin
-            @testset "DNA conversions from Char" begin
-                @test convert(DNA, 'A') == DNA_A
-                @test convert(DNA, 'C') == DNA_C
-                @test convert(DNA, 'G') == DNA_G
-                @test convert(DNA, 'T') == DNA_T
-                @test convert(DNA, 'N') == DNA_N
-            end
-
-            @testset "RNA conversions from Char" begin
-                @test convert(RNA, 'A') == RNA_A
-                @test convert(RNA, 'C') == RNA_C
-                @test convert(RNA, 'G') == RNA_G
-                @test convert(RNA, 'U') == RNA_U
-                @test convert(RNA, 'N') == RNA_N
-            end
-
-            @testset "DNA conversions to Char" begin
-                @test convert(Char, DNA_A) == 'A'
-                @test convert(Char, DNA_C) == 'C'
-                @test convert(Char, DNA_G) == 'G'
-                @test convert(Char, DNA_T) == 'T'
-                @test convert(Char, DNA_N) == 'N'
-            end
-
-            @testset "RNA conversions to Char" begin
-                @test convert(Char, RNA_A) == 'A'
-                @test convert(Char, RNA_C) == 'C'
-                @test convert(Char, RNA_G) == 'G'
-                @test convert(Char, RNA_U) == 'U'
-                @test convert(Char, RNA_N) == 'N'
-            end
-        end
-
-        @testset "Other numeric types" begin
-            @test convert(Int, DNA_A) === 1
-            @test convert(Int, DNA_C) === 2
-            @test convert(Int, DNA_G) === 4
-            @test convert(Int, DNA_T) === 8
-            @test convert(Int, DNA_N) === 15
-            @test convert(DNA,  1) === DNA_A
-            @test convert(DNA,  2) === DNA_C
-            @test convert(DNA,  4) === DNA_G
-            @test convert(DNA,  8) === DNA_T
-            @test convert(DNA, 15) === DNA_N
-
-            @test convert(Int, RNA_A) === 1
-            @test convert(Int, RNA_C) === 2
-            @test convert(Int, RNA_G) === 4
-            @test convert(Int, RNA_U) === 8
-            @test convert(Int, RNA_N) === 15
-            @test convert(RNA,  1) === RNA_A
-            @test convert(RNA,  2) === RNA_C
-            @test convert(RNA,  4) === RNA_G
-            @test convert(RNA,  8) === RNA_U
-            @test convert(RNA, 15) === RNA_N
-        end
+# NOTE: Most tests related to biological symbols are located in BioSymbols.jl.
+@testset "Symbols" begin
+    @testset "DNA" begin
+        @test DNA_A === BioSymbols.DNA_A
+        @test ACGT  === BioSymbols.ACGT
+        @test ACGTN === BioSymbols.ACGTN
+        @test typeof(DNA_A) === BioSymbols.DNA
     end
 
-    @testset "iscompatible" begin
-        @test  iscompatible(DNA_A, DNA_A)
-        @test  iscompatible(DNA_A, DNA_R)
-        @test !iscompatible(DNA_C, DNA_A)
-        @test !iscompatible(DNA_C, DNA_R)
-
-        for x in alphabet(DNA)
-            @test iscompatible(x, DNA_N) == (x != DNA_Gap)
-            @test iscompatible(DNA_N, x) == (x != DNA_Gap)
-        end
-
-        @test  iscompatible(RNA_A, RNA_A)
-        @test  iscompatible(RNA_A, RNA_R)
-        @test !iscompatible(RNA_C, RNA_A)
-        @test !iscompatible(RNA_C, RNA_R)
-
-        for x in alphabet(RNA)
-            @test iscompatible(x, RNA_N) == (x != RNA_Gap)
-            @test iscompatible(RNA_N, x) == (x != RNA_Gap)
-        end
+    @testset "RNA" begin
+        @test RNA_A === BioSymbols.RNA_A
+        @test ACGU  === BioSymbols.ACGU
+        @test ACGUN === BioSymbols.ACGUN
+        @test typeof(RNA_A) === BioSymbols.RNA
     end
 
-    @testset "isambiguous" begin
-        for nt in alphabet(DNA)
-            @test isambiguous(nt) == (nt ∉ (DNA_A, DNA_C, DNA_G, DNA_T, DNA_Gap))
-        end
-        for nt in alphabet(RNA)
-            @test isambiguous(nt) == (nt ∉ (RNA_A, RNA_C, RNA_G, RNA_U, RNA_Gap))
-        end
+    @testset "AminoAcid" begin
+        @test AA_A === BioSymbols.AA_A
+        @test typeof(AA_A) === BioSymbols.AminoAcid
     end
 
-    @testset "ispurine" begin
-        for nt in alphabet(DNA)
-            @test ispurine(nt) == (nt == DNA_A || nt == DNA_G || nt == DNA_R)
-        end
-        for nt in alphabet(RNA)
-            @test ispurine(nt) == (nt == RNA_A || nt == RNA_G || nt == RNA_R)
-        end
+    @testset "Predicate functions" begin
+        @test iscompatible(DNA_A, DNA_N)
+        @test isambiguous(DNA_N)
+        @test iscertain(DNA_A)
+        @test isgap(DNA_Gap)
+        @test ispurine(DNA_A)
+        @test ispyrimidine(DNA_C)
+        @test isGC(DNA_G)
     end
 
-    @testset "ispyrimidine" begin
-        for nt in alphabet(DNA)
-            @test ispyrimidine(nt) == (nt == DNA_T || nt == DNA_C || nt == DNA_Y)
-        end
-        for nt in alphabet(RNA)
-            @test ispyrimidine(nt) == (nt == RNA_U || nt == RNA_C || nt == RNA_Y)
-        end
-    end
-
-    @testset "complement" begin
+    @testset "Misc. functions" begin
+        @test length(alphabet(DNA)) == 16
+        @test gap(DNA) === DNA_Gap
         @test complement(DNA_A) === DNA_T
-        @test complement(DNA_C) === DNA_G
-        @test complement(DNA_G) === DNA_C
-        @test complement(DNA_T) === DNA_A
-        @test complement(DNA_Gap) === DNA_Gap
-        @test complement(DNA_N) === DNA_N
-
-        @test complement(RNA_A) === RNA_U
-        @test complement(RNA_C) === RNA_G
-        @test complement(RNA_G) === RNA_C
-        @test complement(RNA_U) === RNA_A
-        @test complement(RNA_Gap) === RNA_Gap
-        @test complement(RNA_N) === RNA_N
     end
 
     @testset "Encoder" begin
-        @testset "DNA" begin
-            encode = Seq.encode
-            EncodeError = Seq.EncodeError
+        encode = Seq.encode
+        EncodeError = Seq.EncodeError
 
+        @testset "DNA" begin
             # 2 bits
             @test encode(DNAAlphabet{2}, DNA_A) === 0x00
             @test encode(DNAAlphabet{2}, DNA_C) === 0x01
@@ -370,10 +191,8 @@ end
             end
             @test_throws EncodeError encode(DNAAlphabet{4}, reinterpret(DNA, 0b10000))
         end
-        @testset "RNA" begin
-            encode = Seq.encode
-            EncodeError = Seq.EncodeError
 
+        @testset "RNA" begin
             # 2 bits
             @test encode(RNAAlphabet{2}, RNA_A) === 0x00
             @test encode(RNAAlphabet{2}, RNA_C) === 0x01
@@ -389,13 +208,21 @@ end
             end
             @test_throws EncodeError encode(RNAAlphabet{4}, reinterpret(RNA, 0b10000))
         end
+
+        @testset "AminoAcid" begin
+            @test encode(AminoAcidAlphabet, AA_A) === 0x00
+            for aa in alphabet(AminoAcid)
+                @test encode(AminoAcidAlphabet, aa) === convert(UInt8, aa)
+            end
+            @test_throws Seq.EncodeError encode(AminoAcidAlphabet, BioSymbols.AA_INVALID)
+        end
     end
 
     @testset "Decoder" begin
-        @testset "DNA" begin
-            decode = Seq.decode
-            DecodeError = Seq.DecodeError
+        decode = Seq.decode
+        DecodeError = Seq.DecodeError
 
+        @testset "DNA" begin
             # 2 bits
             @test decode(DNAAlphabet{2}, 0x00) === DNA_A
             @test decode(DNAAlphabet{2}, 0x01) === DNA_C
@@ -410,10 +237,8 @@ end
             end
             @test_throws DecodeError decode(DNAAlphabet{4}, 0b10000)
         end
-        @testset "RNA" begin
-            decode = Seq.decode
-            DecodeError = Seq.DecodeError
 
+        @testset "RNA" begin
             # 2 bits
             @test decode(RNAAlphabet{2}, 0x00) === RNA_A
             @test decode(RNAAlphabet{2}, 0x01) === RNA_C
@@ -428,242 +253,13 @@ end
             end
             @test_throws DecodeError decode(RNAAlphabet{4}, 0b10000)
         end
-    end
 
-    @testset "Arithmetic and Order" begin
-        @testset "DNA" begin
-            @test ~DNA_Gap === DNA_N
-            @test ~DNA_N   === DNA_Gap
-            @test DNA_A | DNA_C === DNA_M
-            @test DNA_A & DNA_C === DNA_Gap
-            @test DNA_Gap - DNA_A   === -1
-            @test DNA_A   - DNA_Gap === +1
-            @test DNA_Gap + 1 === DNA_Gap + 17 === DNA_A
-            @test DNA_Gap - 1 === DNA_Gap - 17 === DNA_N
-            @test DNA_Gap < DNA_A < DNA_C < DNA_G < DNA_T < DNA_N
-            @test !(DNA_A > DNA_G)
-            @test gap(DNA) === DNA_Gap
-            @test collect(alphabet(DNA)) == sort([
-                DNA_A, DNA_C, DNA_G, DNA_T,
-                DNA_M, DNA_R, DNA_W, DNA_S,
-                DNA_Y, DNA_K, DNA_V, DNA_H,
-                DNA_D, DNA_B, DNA_N, DNA_Gap])
-        end
-        @testset "RNA" begin
-            @test ~RNA_Gap === RNA_N
-            @test ~RNA_N   === RNA_Gap
-            @test RNA_A | RNA_C === RNA_M
-            @test RNA_A & RNA_C === RNA_Gap
-            @test RNA_Gap - RNA_A   === -1
-            @test RNA_A   - RNA_Gap === +1
-            @test RNA_Gap + 1 === RNA_Gap + 17 === RNA_A
-            @test RNA_Gap - 1 === RNA_Gap - 17 === RNA_N
-            @test RNA_Gap < RNA_A < RNA_C < RNA_G < RNA_U < RNA_N
-            @test !(RNA_A > RNA_G)
-            @test gap(RNA) === RNA_Gap
-            @test collect(alphabet(RNA)) == sort([
-                RNA_A, RNA_C, RNA_G, RNA_U,
-                RNA_M, RNA_R, RNA_W, RNA_S,
-                RNA_Y, RNA_K, RNA_V, RNA_H,
-                RNA_D, RNA_B, RNA_N, RNA_Gap])
-        end
-    end
-
-    @testset "Show DNA" begin
-        @testset "print" begin
-            buf = IOBuffer()
-            for nt in [DNA_A, DNA_C, DNA_G, DNA_T, DNA_N, DNA_Gap]
-                print(buf, nt)
+        @testset "AminoAcid" begin
+            @test decode(AminoAcidAlphabet, 0x00) === AA_A
+            for x in 0x00:0x1b
+                @test decode(AminoAcidAlphabet, x) === convert(AminoAcid, x)
             end
-            @test takebuf_string(buf) == "ACGTN-"
-        end
-
-        @testset "show" begin
-            buf = IOBuffer()
-            for nt in [DNA_A, DNA_C, DNA_G, DNA_T, DNA_N, DNA_Gap]
-                show(buf, nt)
-                write(buf, ' ')
-            end
-            @test takebuf_string(buf) == "DNA_A DNA_C DNA_G DNA_T DNA_N DNA_Gap "
-        end
-    end
-
-    @testset "Show RNA" begin
-        @testset "print" begin
-            buf = IOBuffer()
-            for nt in [RNA_A, RNA_C, RNA_G, RNA_U, RNA_N, RNA_Gap]
-                print(buf, nt)
-            end
-            @test takebuf_string(buf) == "ACGUN-"
-        end
-
-        @testset "show" begin
-            buf = IOBuffer()
-            for nt in [RNA_A, RNA_C, RNA_G, RNA_U, RNA_N, RNA_Gap]
-                show(buf, nt)
-                write(buf, ' ')
-            end
-            @test takebuf_string(buf) == "RNA_A RNA_C RNA_G RNA_U RNA_N RNA_Gap "
-        end
-    end
-
-    @testset "Sets" begin
-        @test length(ACGT) == 4
-        @test ACGT[1] === DNA_A
-        @test ACGT[2] === DNA_C
-        @test ACGT[3] === DNA_G
-        @test ACGT[4] === DNA_T
-        @test collect(ACGT) == [DNA_A, DNA_C, DNA_G, DNA_T]
-
-        @test length(ACGU) == 4
-        @test ACGU[1] === RNA_A
-        @test ACGU[2] === RNA_C
-        @test ACGU[3] === RNA_G
-        @test ACGU[4] === RNA_U
-        @test collect(ACGU) == [RNA_A, RNA_C, RNA_G, RNA_U]
-    end
-end
-
-@testset "Aminoacids" begin
-    @testset "Arithmetic and Order" begin
-        @test AA_A + 1 == AA_R
-        @test AA_R + 1 == AA_N
-        @test AA_A + 2 == AA_N
-        @test AA_A + 28 == AA_A
-        @test AA_R - 1 == AA_A
-        @test AA_N - 2 == AA_A
-        @test AA_A - 28 == AA_A
-        @test AA_D - AA_A ==  3
-        @test AA_A - AA_D == -3
-        @test (AA_A < AA_R < AA_N < AA_V < AA_O < AA_U <
-               AA_B < AA_J < AA_Z < AA_X < AA_Term < AA_Gap)
-        @test !(AA_J < AA_B)
-
-        @test gap(AminoAcid) === AA_Gap
-        @test length(alphabet(AminoAcid)) == 28
-        @test AA_A in alphabet(AminoAcid)
-        @test AA_I in alphabet(AminoAcid)
-        @test AA_U in alphabet(AminoAcid)
-    end
-
-    @testset "Range" begin
-        @test !(AA_C in AA_Q:AA_H)
-        @test   AA_Q in AA_Q:AA_H
-        @test   AA_E in AA_Q:AA_H
-        @test   AA_G in AA_Q:AA_H
-        @test   AA_H in AA_Q:AA_H
-        @test !(AA_I in AA_Q:AA_H)
-
-        @test collect(AA_W:AA_V) == [AA_W, AA_Y, AA_V]
-    end
-
-    @testset "Encoder" begin
-        encode = Seq.encode
-        @test encode(AminoAcidAlphabet, AA_A) === 0x00
-        for aa in alphabet(AminoAcid)
-            @test encode(AminoAcidAlphabet, aa) === convert(UInt8, aa)
-        end
-        @test_throws Seq.EncodeError encode(AminoAcidAlphabet, Seq.AA_INVALID)
-    end
-
-    @testset "Decoder" begin
-        decode = Seq.decode
-        @test decode(AminoAcidAlphabet, 0x00) === AA_A
-        for x in 0x00:0x1b
-            @test decode(AminoAcidAlphabet, x) === convert(AminoAcid, x)
-        end
-        @test_throws Seq.DecodeError decode(AminoAcidAlphabet, 0x1c)
-    end
-
-    @testset "iscompatible" begin
-        @test  iscompatible(AA_A, AA_A)
-        @test !iscompatible(AA_A, AA_R)
-
-        for x in alphabet(AminoAcid)
-            @test iscompatible(x, AA_B) == (x ∈ (AA_D, AA_N, AA_B, AA_X))
-            @test iscompatible(x, AA_J) == (x ∈ (AA_I, AA_L, AA_J, AA_X))
-            @test iscompatible(x, AA_Z) == (x ∈ (AA_E, AA_Q, AA_Z, AA_X))
-            @test iscompatible(x, AA_X) == (x ∉ (AA_Term, AA_Gap))
-        end
-    end
-
-    @testset "isambiguous" begin
-        for x in alphabet(AminoAcid)
-            @test isambiguous(x) == (AA_B <= x <= AA_X)
-        end
-    end
-
-    @testset "Show amino acid" begin
-        @testset "print" begin
-            buf = IOBuffer()
-            for aa in [AA_A, AA_D, AA_B, AA_X, AA_Term, AA_Gap]
-                print(buf, aa)
-            end
-            @test takebuf_string(buf) == "ADBX*-"
-        end
-
-        @testset "show" begin
-            buf = IOBuffer()
-            for aa in [AA_A, AA_D, AA_B, AA_X, AA_Term, AA_Gap]
-                show(buf, aa)
-                write(buf, ' ')
-            end
-            @test takebuf_string(buf) == "AA_A AA_D AA_B AA_X AA_Term AA_Gap "
-        end
-    end
-
-    @testset "Parsers" begin
-        @testset "Valid Cases" begin
-            # case-insensitive and ignores spaces
-            @test parse(AminoAcid, "a") == AA_A
-            @test parse(AminoAcid, "Ala") == AA_A
-            @test parse(AminoAcid, "aLa ") == AA_A
-            @test parse(AminoAcid, " alA ") == AA_A
-            @test parse(AminoAcid, "\tAlA\n") == AA_A
-            @test parse(AminoAcid, "x") == AA_X
-            @test parse(AminoAcid, "X") == AA_X
-            aas = [
-                ("A", "ALA", AA_A),
-                ("R", "ARG", AA_R),
-                ("N", "ASN", AA_N),
-                ("D", "ASP", AA_D),
-                ("C", "CYS", AA_C),
-                ("E", "GLU", AA_E),
-                ("Q", "GLN", AA_Q),
-                ("G", "GLY", AA_G),
-                ("H", "HIS", AA_H),
-                ("I", "ILE", AA_I),
-                ("L", "LEU", AA_L),
-                ("K", "LYS", AA_K),
-                ("M", "MET", AA_M),
-                ("F", "PHE", AA_F),
-                ("P", "PRO", AA_P),
-                ("S", "SER", AA_S),
-                ("T", "THR", AA_T),
-                ("W", "TRP", AA_W),
-                ("Y", "TYR", AA_Y),
-                ("V", "VAL", AA_V),
-                ("O", "PYL", AA_O),
-                ("U", "SEC", AA_U),
-                ("B", "ASX", AA_B),
-                ("J", "XLE", AA_J),
-                ("Z", "GLX", AA_Z),
-                ("X", "XAA", AA_X),
-            ]
-            @test length(aas) == 26
-            for (one, three, aa) in aas
-                @test parse(AminoAcid, one) == aa
-                @test parse(AminoAcid, three) == aa
-            end
-            @test parse(AminoAcid, "*") == AA_Term
-            @test parse(AminoAcid, "-") == AA_Gap
-        end
-
-        @testset "Invalid Cases" begin
-            @test_throws Exception parse(AminoAcid, "")
-            @test_throws Exception parse(AminoAcid, "AL")
-            @test_throws Exception parse(AminoAcid, "LA")
-            @test_throws Exception parse(AminoAcid, "ALAA")
+            @test_throws Seq.DecodeError decode(AminoAcidAlphabet, 0x1c)
         end
     end
 end
@@ -776,6 +372,17 @@ end
         EncodeError = Seq.EncodeError
         @test_throws EncodeError convert(BioSequence{DNAAlphabet{2}}, dna"AN")
         @test_throws EncodeError convert(BioSequence{RNAAlphabet{2}}, rna"AN")
+
+        # test promotion
+        a = BioSequence{DNAAlphabet{2}}("ATCG")
+        b = BioSequence{DNAAlphabet{4}}("ATCG")
+        c = BioSequence{RNAAlphabet{2}}("AUCG")
+        d = BioSequence{RNAAlphabet{4}}("AUCG")
+
+        @test typeof(promote(a, b)) == Tuple{BioSequence{DNAAlphabet{4}},BioSequence{DNAAlphabet{4}}}
+        @test typeof(promote(c, d)) == Tuple{BioSequence{RNAAlphabet{4}},BioSequence{RNAAlphabet{4}}}
+        @test typeof(promote(a, d)) == Tuple{BioSequence{DNAAlphabet{2}},BioSequence{RNAAlphabet{4}}}
+        @test typeof(promote(a, b, d)) == Tuple{BioSequence{DNAAlphabet{2}},BioSequence{DNAAlphabet{4}},BioSequence{RNAAlphabet{4}}}
     end
 
     @testset "Conversion between RNA and DNA" begin
@@ -1036,6 +643,17 @@ end
         @test hash(rna"AAUUAA"[3:5]) === hash(rna"UUA")
         @test hash(aa"MTTQAPMFTQPLQ") === hash(aa"MTTQAPMFTQPLQ")
         @test hash(aa"MTTQAPMFTQPLQ"[5:10]) === hash(aa"APMFTQ")
+
+        @testset "MinHash" begin
+            seq = DNASequence(random_dna(1000))
+            h = minhash(seq, 10, 100)
+
+            @test length(h) == 100
+            @test h == minhash(seq, 10, 100)
+
+            @test_throws BoundsError h[101]
+        end
+
     end
 
     @testset "Length" begin
@@ -1320,7 +938,11 @@ end
 
         buf = IOBuffer()
         print(buf, dna"A"^100)
-        @test takebuf_string(buf) == "A"^70 * "\n" * "A"^30
+        @test takebuf_string(buf) == "A"^100
+
+        buf = IOBuffer()
+        print(buf, dna"A"^100, width=70)
+        @test takebuf_string(buf) == string("A"^70, '\n', "A"^30)
     end
 
     @testset "Transformations" begin
@@ -1599,67 +1221,151 @@ end
         @test findlast(seq, DNA_T) == 0
     end
 
-    @testset "Mismatches" begin
-        @test mismatches(dna"ACGT", dna"ACGT") == 0
-        @test mismatches(dna"ACGT", dna"ACGTT") == 0
-        @test mismatches(dna"ACGT", dna"ACGA") == 1
-        @test mismatches(dna"ACGT", dna"ACGAA") == 1
+    @testset "Site counting" begin
+        @testset "Naive methods" begin
+            NC = Seq.NaiveCount
 
-        @test mismatches(rna"ACGU", rna"ACGU") == 0
-        @test mismatches(rna"ACGU", rna"ACGUU") == 0
-        @test mismatches(rna"ACGU", rna"ACGA") == 1
-        @test mismatches(rna"ACGU", rna"ACGAA") == 1
+            alphabets = (DNAAlphabet{4}, DNAAlphabet{2},
+                         RNAAlphabet{4}, RNAAlphabet{2})
 
-        @test mismatches(aa"MTTQAP", aa"MTTQAP") == 0
-        @test mismatches(aa"MTTQAP", aa"MTTQAPM") == 0
-        @test mismatches(aa"MTTQAP", aa"MTTQAT") == 1
-        @test mismatches(aa"MTTQAP", aa"MTTQATT") == 1
+            for alph in alphabets
 
-        @test mismatches(dna"ACGT", dna"TACTG"[2:end]) == 2
-        @test mismatches(dna"ACGT"[2:end], dna"AGT") == 1
+                # Answers to these tests were worked out manually to verify
+                # count_sites_naive was working correctly.
+                # seqA and seqB contain all possible observations of sites.
 
-        function test_mismatches(A, a, b)
-            count = 0
-            for (x, y) in zip(a, b)
-                if (A == AminoAcidAlphabet && x != y && x != 'X' && y != 'X') ||
-                   (A != AminoAcidAlphabet && x != y && x != 'N' && y != 'N')
-                    count += 1
+                istwobit = Seq.bitsof(alph) == 2
+
+                seqA, seqB = generate_possibilities_tester(alph)
+
+                # Test methods which work on single sequences.
+                @test count(Certain, NC, seqA) == ifelse(istwobit, length(seqA), 49)
+                @test count(Certain, NC, seqB) == ifelse(istwobit, length(seqB), 19)
+                @test count(Gap, NC, seqA) == ifelse(istwobit, 0, 16)
+                @test count(Gap, NC, seqB) == ifelse(istwobit, 0, 1)
+                @test count(Ambiguous, NC, seqA) == ifelse(istwobit, 0, length(seqA) - 65)
+                @test count(Ambiguous, NC, seqB) == ifelse(istwobit, 0, length(seqB) - 20)
+
+                # Test methods which work on two sequences.
+                # Test when sequences are of the same bitencoding.
+
+                @test count(Certain, NC, seqA, seqB) == count(Certain, NC, seqB, seqA) == 10
+                @test count(Gap, NC, seqA, seqB) == count(Gap, NC, seqB, seqA) == ifelse(istwobit, 0, 16)
+                @test count(Ambiguous, NC, seqA, seqB) == count(Ambiguous, NC, seqB, seqA) == ifelse(istwobit, 0, 121)
+                @test count(Match, NC, seqA, seqB) == count(Match, NC, seqB, seqA) == length(alphabet(alph))
+                @test count(Mismatch, NC, seqA, seqB) == count(Mismatch, NC, seqB, seqA) == (length(seqA) - length(alphabet(alph)))
+            end
+
+            # Test for when sequences are of different bitencodings.
+            for alphs in [(DNAAlphabet{2}, DNAAlphabet{4}),
+                          (RNAAlphabet{2}, RNAAlphabet{4})]
+                seqA, seqB = generate_possibilities_tester(alphs...)
+                @test count(Certain, NC, seqA, seqB) == count(Certain, NC, seqB, seqA) == 16
+                @test count(Gap, NC, seqA, seqB) == count(Gap, NC, seqB, seqA) == 4
+                @test count(Ambiguous, NC, seqA, seqB) == count(Ambiguous, NC, seqB, seqA) == 44
+                @test count(Match, NC, seqA, seqB) == count(Match, NC, seqB, seqA) == 4
+                @test count(Mismatch, NC, seqA, seqB) == count(Mismatch, NC, seqB, seqA) == 60
+            end
+        end
+
+        @testset "Bit parallel methods" begin
+            BC = Seq.BitparCount
+            NC = Seq.NaiveCount
+            # Having determined that naive counting algorithm is correct.
+            # We can verify the bitparallel algorithm is correct by randomly
+            # generating test-cases, and verifying the naive algorithm, and
+            # the bitparallel algorithm give the same answer.
+            @testset "4 bit encoding" begin
+                alphabets = (DNAAlphabet{4}, RNAAlphabet{4})
+                for alph in alphabets
+                    for _ in 1:50
+                        seqA = random_seq(alph, rand(10:100))
+                        seqB = random_seq(alph, rand(10:100))
+                        subA = seqA[1:rand(10:length(seqA))]
+                        subB = seqB[1:rand(10:length(seqB))]
+                        @test count(Mismatch, BC, subA, subB) == count(Mismatch, BC, subB, subA) == count(Mismatch, NC, subA, subB)
+                        @test count(Match, BC, subA, subB) == count(Match, BC, subB, subA) == count(Match, NC, subA, subB)
+                        @test count(Certain, BC, subA, subB) == count(Certain, BC, subB, subA) == count(Certain, NC, subA, subB)
+                        @test count(Gap, BC, subA, subB) == count(Gap, BC, subB, subA) == count(Gap, NC, subA, subB)
+                        @test count(Ambiguous, BC, subA, subB) == count(Ambiguous, BC, subB, subA) == count(Ambiguous, NC, subA, subB)
+                    end
                 end
             end
-            seq_a = BioSequence{A}(a)
-            seq_b = BioSequence{A}(b)
-            @test mismatches(seq_a, seq_b, true) ==
-                  mismatches(seq_b, seq_a, true) ==
-                  count
-        end
 
-        function test_mismatches_strict(A, a, b)
-            count = 0
-            for (x, y) in zip(a, b)
-                if x != y
-                    count += 1
+            @testset "2 bit encoding" begin
+                alphabets = (DNAAlphabet{2}, RNAAlphabet{2})
+                for alph in alphabets
+                    for _ in 1:50
+                        seqA = random_seq(alph, rand(10:100))
+                        seqB = random_seq(alph, rand(10:100))
+                        subA = seqA[1:rand(10:length(seqA))]
+                        subB = seqB[1:rand(10:length(seqB))]
+                        @test count(Mismatch, BC, subA, subB) == count(Mismatch, BC, subB, subA) == count(Mismatch, NC, subA, subB)
+                        @test count(Match, BC, subA, subB) == count(Match, BC, subB, subA) == count(Match, NC, subA, subB)
+                    end
                 end
             end
-            seq_a = BioSequence{A}(a)
-            seq_b = BioSequence{A}(b)
-            @test mismatches(seq_a, seq_b, false) ==
-                  mismatches(seq_b, seq_a, false) ==
-                  count
         end
 
-        for len in [0, 1, 10, 32, 1000], _ in 1:10
-            test_mismatches(DNAAlphabet{4}, random_dna(len), random_dna(len))
-            test_mismatches(RNAAlphabet{4}, random_rna(len), random_rna(len))
-            test_mismatches(AminoAcidAlphabet, random_aa(len), random_aa(len))
+        @testset "Windowed methods" begin
+            dnaA = dna"ATCGCCA-M"
+            dnaB = dna"ATCGCCTAA"
+            rnaA = rna"AUCGCCA-M"
+            rnaB = rna"AUCGCCUAA"
+            for seqs in ((dnaA, dnaB), (rnaA, rnaB))
 
-            test_mismatches_strict(DNAAlphabet{4}, random_dna(len), random_dna(len))
-            test_mismatches_strict(RNAAlphabet{4}, random_rna(len), random_rna(len))
-            test_mismatches_strict(AminoAcidAlphabet, random_aa(len), random_aa(len))
-
-            probs = [0.25, 0.25, 0.25, 0.25, 0.00]
-            test_mismatches(DNAAlphabet{2}, random_dna(len, probs), random_dna(len, probs))
-            test_mismatches(RNAAlphabet{2}, random_rna(len, probs), random_rna(len, probs))
+                @test count(Certain, seqs[1], seqs[2], 3, 1) == [IntervalValue(1, 3, 3),
+                                                                 IntervalValue(2, 4, 3),
+                                                                 IntervalValue(3, 5, 3),
+                                                                 IntervalValue(4, 6, 3),
+                                                                 IntervalValue(5, 7, 3),
+                                                                 IntervalValue(6, 8, 2),
+                                                                 IntervalValue(7, 9, 1)]
+                @test count(Ambiguous, seqs[1], seqs[2], 3, 1) == [IntervalValue(1, 3, 0),
+                                                                   IntervalValue(2, 4, 0),
+                                                                   IntervalValue(3, 5, 0),
+                                                                   IntervalValue(4, 6, 0),
+                                                                   IntervalValue(5, 7, 0),
+                                                                   IntervalValue(6, 8, 0),
+                                                                   IntervalValue(7, 9, 1)]
+                @test count(Gap, seqs[1], seqs[2], 3, 1) == [IntervalValue(1, 3, 0),
+                                                             IntervalValue(2, 4, 0),
+                                                             IntervalValue(3, 5, 0),
+                                                             IntervalValue(4, 6, 0),
+                                                             IntervalValue(5, 7, 0),
+                                                             IntervalValue(6, 8, 1),
+                                                             IntervalValue(7, 9, 1)]
+                @test count(Match, seqs[1], seqs[2], 3, 1) == [IntervalValue(1, 3, 3),
+                                                               IntervalValue(2, 4, 3),
+                                                               IntervalValue(3, 5, 3),
+                                                               IntervalValue(4, 6, 3),
+                                                               IntervalValue(5, 7, 2),
+                                                               IntervalValue(6, 8, 1),
+                                                               IntervalValue(7, 9, 0)]
+                @test count(Mismatch, seqs[1], seqs[2], 3, 1) == [IntervalValue(1, 3, 0),
+                                                                  IntervalValue(2, 4, 0),
+                                                                  IntervalValue(3, 5, 0),
+                                                                  IntervalValue(4, 6, 0),
+                                                                  IntervalValue(5, 7, 1),
+                                                                  IntervalValue(6, 8, 2),
+                                                                  IntervalValue(7, 9, 3)]
+            end
         end
+#=
+        @testset "Pairwise methods" begin
+            dnas = [dna"ATCGCCA-", dna"ATCGCCTA", dna"ATCGCCT-", dna"GTCGCCTA"]
+            rnas = [rna"AUCGCCA-", rna"AUCGCCUA", rna"AUCGCCU-", rna"GUCGCCUA"]
+            answer_mismatch = PWM{Int, false}([0 2 1 3; 2 0 1 1; 1 1 0 2; 3 1 2 0])
+            answer_match = PWM{Int, false}([0 6 7 5; 6 0 7 7; 7 7 0 6; 5 7 6 0])
+            for i in (dnas, rnas)
+                @test count_pairwise(Mismatch, i...) == answer_mismatch
+                @test count_pairwise(Match, i...) == answer_match
+                @test count_pairwise(Certain, i...) == PWM{Int, false}([0 7 7 7; 7 0 7 8; 7 7 0 7; 7 8 7 0])
+                @test count_pairwise(Ambiguous, i...) == PWM{Int, false}([0 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 0])
+                @test count_pairwise(Gap, i...) == PWM{Int, false}([0 1 1 1; 1 0 1 0; 1 1 0 1; 1 0 1 0])
+            end
+        end
+=#
     end
 
     @testset "GC content" begin
@@ -1818,7 +1524,7 @@ end
 
         buf = IOBuffer()
         print(buf, ReferenceSequence(dna"A"^100))
-        @test takebuf_string(buf) == "A"^70 * "\n" * "A"^30
+        @test takebuf_string(buf) == "A"^100
     end
 
     @testset "Random sequence" begin
@@ -2098,6 +1804,10 @@ end
             # N is not allowed in Kmers
             @test_throws Exception DNAKmer("ACGTNACGT")
             @test_throws Exception RNAKmer("ACGUNACGU")
+
+            # Test string literals
+            @test kmer"ACTG" == convert(Kmer, DNASequence("ACTG"))
+            @test isa(kmer"ACGT", DNAKmer{4})
         end
     end
 
@@ -3119,14 +2829,14 @@ end
     end
 
     @testset "FASTQ" begin
-        @test isa(FASTQSeqRecord("1", dna"AA", Int8[10, 11]), FASTQSeqRecord{DNASequence})
-        @test isa(FASTQSeqRecord("1", dna"AA", Int8[10, 11], "desc."), FASTQSeqRecord{DNASequence})
-        @test_throws ArgumentError FASTQSeqRecord("1", dna"AA", Int8[10])
+        @test isa(FASTQ.Record("1", dna"AA", UInt8[10, 11]), FASTQ.Record)
+        @test isa(FASTQ.Record("1", "desc.", dna"AA", UInt8[10, 11]), FASTQ.Record)
+        @test_throws ArgumentError FASTQ.Record("1", dna"AA", UInt8[10])
 
         output = IOBuffer()
-        writer = FASTQWriter(output)
-        write(writer, FASTQSeqRecord("1", dna"AN", Int8[11, 25]))
-        write(writer, FASTQSeqRecord("2", dna"TGA", Int8[40, 41, 45], "high quality"))
+        writer = FASTQ.Writer(output)
+        write(writer, FASTQ.Record("1", dna"AN", UInt8[11, 25]))
+        write(writer, FASTQ.Record("2", "high quality", dna"TGA", UInt8[40, 41, 45]))
         flush(writer)
         @test takebuf_string(output) == """
         @1
@@ -3140,9 +2850,9 @@ end
         """
 
         output = IOBuffer()
-        writer = FASTQWriter(output, quality_header=true)
-        write(writer, FASTQSeqRecord("1", dna"AN", Int8[11, 25]))
-        write(writer, FASTQSeqRecord("2", dna"TGA", Int8[40, 41, 45], "high quality"))
+        writer = FASTQ.Writer(output, quality_header=true)
+        write(writer, FASTQ.Record("1", dna"AN", UInt8[11, 25]))
+        write(writer, FASTQ.Record("2", "high quality", dna"TGA", UInt8[40, 41, 45]))
         flush(writer)
         @test takebuf_string(output) == """
         @1
@@ -3155,71 +2865,116 @@ end
         IJN
         """
 
-        function test_fastq_parse(filename, valid, encoding)
-            # Reading from a stream
-            stream = open(FASTQReader, filename, quality_encoding=encoding)
-            @test eltype(stream) == FASTQSeqRecord{DNASequence}
+        @testset "Record" begin
+            record = FASTQ.Record()
+            @test !isfilled(record)
+
+            record = FASTQ.Record("""
+            @SRR1238088.1.1 HWI-ST499:111:D0G94ACXX:1:1101:1173:2105
+            AAGCTCATGACCCGTCTTACCTACACCCTTGACGAGATCGAAGGA
+            +SRR1238088.1.1 HWI-ST499:111:D0G94ACXX:1:1101:1173:2105
+            @BCFFFDFHHHHHJJJIJIJJIJJJJJJJJIJJJJIIIJJJIJJJ
+            """)
+            @test isfilled(record)
+            @test FASTQ.hasidentifier(record) == hasseqname(record) == true
+            @test FASTQ.identifier(record) == seqname(record) == "SRR1238088.1.1"
+            @test FASTQ.hasdescription(record)
+            @test FASTQ.description(record) == "HWI-ST499:111:D0G94ACXX:1:1101:1173:2105"
+            @test FASTQ.hassequence(record) == hassequence(record) == true
+            @test FASTQ.sequence(DNASequence, record) == dna"AAGCTCATGACCCGTCTTACCTACACCCTTGACGAGATCGAAGGA"
+            @test FASTQ.sequence(record) == sequence(record) == dna"AAGCTCATGACCCGTCTTACCTACACCCTTGACGAGATCGAAGGA"
+            @test FASTQ.sequence(String, record) == "AAGCTCATGACCCGTCTTACCTACACCCTTGACGAGATCGAAGGA"
+            @test FASTQ.hasquality(record)
+            @test FASTQ.quality(record) == b"@BCFFFDFHHHHHJJJIJIJJIJJJJJJJJIJJJJIIIJJJIJJJ" .- 33
+
+            record = FASTQ.Record("""
+            @SRR1238088.1.1
+            AAGCTCATGACCCGTCTTACCTACACCCTTGACGAGATCGAAGGA
+            +
+            @BCFFFDFHHHHHJJJIJIJJIJJJJJJJJIJJJJIIIJJJIJJJ
+            """)
+            @test isfilled(record)
+            @test !FASTQ.hasdescription(record)
+        end
+
+        function test_records(rs1, rs2)
+            if length(rs1) != length(rs2)
+                return false
+            end
+            for (r1, r2) in zip(rs1, rs2)
+                if FASTQ.identifier(r1) != FASTQ.identifier(r2) ||
+                   FASTQ.sequence(r1)   != FASTQ.sequence(r2)   ||
+                   FASTQ.quality(r1)    != FASTQ.quality(r2)
+                    return false
+                end
+            end
+            return true
+        end
+
+        function test_fastq_parse(filename, valid)
+            # Reading from a reader
+            reader = open(FASTQ.Reader, filename)
+            @test eltype(reader) == FASTQ.Record
             if valid
-                for seqrec in stream end
+                for record in reader end
                 @test true  # no error
-                @test close(stream) === nothing
+                @test close(reader) === nothing
             else
                 @test_throws Exception begin
-                    for seqrec in stream end
+                    for record in reader end
                 end
                 return
             end
 
             # in-place parsing
-            stream = open(FASTQReader, filename, quality_encoding=encoding)
-            entry = eltype(stream)()
-            while !eof(stream)
-                read!(stream, entry)
+            reader = open(FASTQ.Reader, filename)
+            record = eltype(reader)()
+            try
+                while true
+                    read!(reader, record)
+                end
+            catch ex
+                close(reader)
+                if !isa(ex, EOFError)
+                    rethrow()
+                end
             end
 
             # Check round trip
             output = IOBuffer()
-            writer = FASTQWriter(output, quality_encoding=encoding)
-            expected_entries = Any[]
-            for seqrec in open(FASTQReader, filename, quality_encoding=encoding)
-                write(writer, seqrec)
-                push!(expected_entries, seqrec)
+            writer = FASTQ.Writer(output)
+            expected_entries = FASTQ.Record[]
+            for record in open(FASTQ.Reader, filename)
+                write(writer, record)
+                push!(expected_entries, record)
             end
             flush(writer)
 
             seekstart(output)
-            read_entries = Any[]
-            for seqrec in FASTQReader(output, quality_encoding=encoding)
-                push!(read_entries, seqrec)
+            read_entries = FASTQ.Record[]
+            for record in FASTQ.Reader(output)
+                push!(read_entries, record)
             end
 
-            @test expected_entries == read_entries
+            return test_records(expected_entries, read_entries)
         end
 
         get_bio_fmt_specimens()
         path = joinpath(dirname(@__FILE__), "..", "BioFmtSpecimens", "FASTQ")
         for specimen in YAML.load_file(joinpath(path, "index.yml"))
-            tags = get(specimen, "tags", "")
+            tags = split(get(specimen, "tags", ""))
             valid = get(specimen, "valid", true)
             # currently unsupported features
-            if contains(tags, "rna") || contains(tags, "gaps") ||
-               contains(tags, "comments") || contains(tags, "ambiguity")
+            if any(t ∈ tags for t in ["gaps", "rna", "comments", "linewrap"])
                 continue
             end
             filename = specimen["filename"]
-            qualenc = (
-                contains(filename, "_sanger") ? :sanger :
-                contains(filename, "_solexa") ? :solexa :
-                contains(filename, "_illumina") ? :illumina13 : :sanger)
-            test_fastq_parse(joinpath(path, filename), valid, qualenc)
+            test_fastq_parse(joinpath(path, filename), valid)
         end
-
-        # invalid quality encoding
-        @test_throws ArgumentError FASTQReader(IOBuffer(""), quality_encoding=:julia)
 
         @testset "invalid quality encoding" begin
             # Sanger full range (note escape characters before '$' and '\')
-            input = IOBuffer("""
+            record = FASTQ.Record("""
             @FAKE0001 Original version has PHRED scores from 0 to 93 inclusive (in that order)
             ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTAC
             +
@@ -3228,31 +2983,12 @@ end
 
             # the range is not enough in these encodings
             for encoding in (:solexa, :illumina13, :illumina15)
-                seekstart(input)
-                reader = FASTQReader(input, quality_encoding=encoding)
-                @test_throws Exception first(reader)
+                @test_throws ErrorException FASTQ.quality(record, encoding)
             end
 
             # the range is enough in these encodings
             for encoding in (:sanger, :illumina18)
-                seekstart(input)
-                reader = FASTQReader(input, quality_encoding=encoding)
-                @test metadata(first(reader)).quality == collect(0:93)
-            end
-        end
-
-        @testset "specified sequence type" begin
-            input = IOBuffer("""
-            @foobar
-            TTCTAAATT
-            +
-            HHFHEHHDF
-            """)
-            for A in (DNAAlphabet{2}, DNAAlphabet{4})
-                seekstart(input)
-                record = first(FASTQReader{BioSequence{A}}(input))
-                @test record.name == "foobar"
-                @test typeof(record.seq) == BioSequence{A}
+                @test FASTQ.quality(record, encoding) == collect(0:93)
             end
         end
 
@@ -3263,59 +2999,58 @@ end
             +
             BBBB##AAAA##
             """)
-            @test first(FASTQReader(input, fill_ambiguous=nothing)).seq == dna"ACGTNRACGTNR"
+            @test FASTQ.sequence(first(FASTQ.Reader(input, fill_ambiguous=nothing))) == dna"ACGTNRACGTNR"
             seekstart(input)
-            @test first(FASTQReader(input, fill_ambiguous=DNA_A)).seq == dna"ACGTAAACGTAA"
+            @test FASTQ.sequence(first(FASTQ.Reader(input, fill_ambiguous=DNA_A)))   == dna"ACGTAAACGTAA"
             seekstart(input)
-            @test first(FASTQReader(input, fill_ambiguous=DNA_G)).seq == dna"ACGTGGACGTGG"
+            @test FASTQ.sequence(first(FASTQ.Reader(input, fill_ambiguous=DNA_G)))   == dna"ACGTGGACGTGG"
             seekstart(input)
-            @test first(FASTQReader(input, fill_ambiguous=DNA_N)).seq == dna"ACGTNNACGTNN"
+            @test FASTQ.sequence(first(FASTQ.Reader(input, fill_ambiguous=DNA_N)))   == dna"ACGTNNACGTNN"
             seekstart(input)
-            @test first(FASTQReader{BioSequence{DNAAlphabet{2}}}(input, fill_ambiguous=DNA_A)).seq == dna"ACGTAAACGTAA"
+            @test FASTQ.sequence(BioSequence{DNAAlphabet{2}}, first(FASTQ.Reader(input, fill_ambiguous=DNA_A))) == dna"ACGTAAACGTAA"
         end
     end
 
     @testset "2bit" begin
         buffer = IOBuffer()
-        writer = TwoBitWriter(buffer, ["chr1", "chr2"])
+        writer = TwoBit.Writer(buffer, ["chr1", "chr2"])
         chr1 = dna"ACGTNN"
         chr2 = dna"N"^100 * dna"ACGT"^100 * dna"N"^100
         write(writer, SeqRecord("chr1", chr1))
         write(writer, SeqRecord("chr2", chr2))
         seekstart(buffer)
-        reader = TwoBitReader(buffer)
+        reader = TwoBit.Reader(buffer)
         @test length(reader) == 2
-        @test reader["chr1"].name == "chr1"
-        @test reader["chr1"].seq == chr1
-        @test reader["chr2"].name == "chr2"
-        @test reader["chr2"].seq == chr2
-        @test reader["chr1"].name == "chr1"
-        @test reader["chr1"].seq == chr1
+        @test TwoBit.seqnames(reader) == ["chr1", "chr2"]
+        @test TwoBit.sequence(reader["chr1"]) == chr1
+        @test TwoBit.sequence(reader["chr2"]) == chr2
+        @test TwoBit.sequence(reader["chr1"]) == chr1
         @test_throws KeyError reader["chr10"]
-        @test reader[1].name == "chr1"
-        @test reader[2].name == "chr2"
         @test_throws BoundsError reader[3]
 
         function check_2bit_parse(filename)
-            stream = open(TwoBitReader, filename)
-            @test eltype(stream) == SeqRecord{ReferenceSequence,Vector{UnitRange{Int}}}
+            stream = open(TwoBit.Reader, filename)
+            @test eltype(stream) === TwoBit.Record
             # read from a stream
-            for record in stream end
+            for record in stream
+                @test hassequence(record) == TwoBit.hassequence(record) == true
+                @test TwoBit.sequence(ReferenceSequence, record) == TwoBit.sequence(DNASequence, record)
+            end
             close(stream)
 
             # round trip
             buffer = IOBuffer()
-            reader = open(TwoBitReader, filename)
-            writer = TwoBitWriter(buffer, reader.names)
-            expected_entries = Any[]
-            for record in reader
-                write(writer, record)
+            reader = open(TwoBit.Reader, filename)
+            writer = TwoBit.Writer(buffer, TwoBit.seqnames(reader))
+            expected_entries = TwoBit.Record[]
+            for (name, record) in zip(TwoBit.seqnames(reader), reader)
+                write(writer, SeqRecord(name, TwoBit.sequence(record), TwoBit.maskedblocks(record)))
                 push!(expected_entries, record)
             end
 
-            read_entries = Any[]
+            read_entries = TwoBit.Record[]
             seekstart(buffer)
-            for record in TwoBitReader(buffer)
+            for record in TwoBit.Reader(buffer)
                 push!(read_entries, record)
             end
 
@@ -3331,6 +3066,36 @@ end
                 @test check_2bit_parse(filepath)
             else
                 @test_throws Exception check_fasta_parse(filepath)
+            end
+        end
+    end
+
+    @testset "ABIF Reader" begin
+        function check_abif_parse(filename)
+            stream = open(AbifReader, filename)
+
+            for record in stream end
+            for (a,b) in collect(stream[1]) end
+            for (a,b) in getindex(stream, get_tags(stream)) end
+            @test typeof(stream) == AbifReader{IOStream}
+            @test get_tags(stream)[1].name == "AEPt"
+            @test get_tags(stream, "DATA")[1].name == "DATA"
+            @test length(stream["DATA"]) == 12
+            @test length(stream[1]) == 1
+
+            @test typeof(getindex(stream, get_tags(stream))) == Dict{String,Any}
+            @test tagelements(stream, "DATA") == 12
+        end
+
+        get_bio_fmt_specimens()
+        path = Pkg.dir("Bio", "test", "BioFmtSpecimens", "ABI")
+        for specimen in YAML.load_file(joinpath(path, "index.yml"))
+            valid = get(specimen, "valid", true)
+            filepath = joinpath(path, specimen["filename"])
+            if valid
+                check_abif_parse(filepath)
+            else
+                @test_throws Exception check_abif_parse(filepath)
             end
         end
     end

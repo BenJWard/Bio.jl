@@ -29,6 +29,7 @@ export
     DNA_N,
     DNA_Gap,
     ACGT,
+    ACGTN,
     RNA_A,
     RNA_C,
     RNA_G,
@@ -46,6 +47,8 @@ export
     RNA_N,
     RNA_Gap,
     ACGU,
+    ACGUN,
+    isGC,
     iscompatible,
     isambiguous,
     iscertain,
@@ -71,6 +74,7 @@ export
     @char_str,
     @biore_str,
     @prosite_str,
+    @kmer_str,
     matched,
     captured,
     alphabet,
@@ -133,21 +137,18 @@ export
     AA_Term,
     AA_Gap,
     FASTA,
-    FASTAReader,
-    FASTAWriter,
-    FASTASeqRecord,
-    FASTQReader,
-    FASTQWriter,
-    FASTQSeqRecord,
-    TwoBitReader,
-    TwoBitWriter,
+    FASTQ,
+    TwoBit,
+    AbifReader,
+
+    # Alphabets
     Alphabet,
     DNAAlphabet,
     RNAAlphabet,
     NucleicAcidAlphabets,
     AminoAcidAlphabet,
     CharAlphabet,
-    NucleicAcidAlphabet,
+
     ExactSearchQuery,
     ApproximateSearchQuery,
     approxsearch,
@@ -161,7 +162,16 @@ export
     majorityvote,
     tryread!,
     isfilled,
-    MissingFieldException
+    MissingFieldException,
+    MinHashSketch,
+    minhash,
+    Site,
+    Certain,
+    Ambiguous,
+    Gap,
+    Match,
+    Mismatch,
+    count_pairwise
 
 import Automa
 import Automa.RegExp: @re_str
@@ -172,30 +182,19 @@ import BufferedStreams: BufferedStreams, BufferedInputStream, BufferedOutputStre
 import Combinatorics
 import IndexableBitVectors
 import Iterators
+import IntervalTrees: IntervalValue
+import PairwiseListMatrices: PairwiseListMatrix
+import Twiddle: enumerate_nibbles,
+    nibble_mask,
+    count_zero_nibbles,
+    count_nonzero_nibbles,
+    count_zero_bitpairs,
+    count_nonzero_bitpairs
 importall Bio
-
-"""
-    alphabet(typ)
-
-Return an iterator of symbols of `typ`.
-
-`typ` is one of `DNA`, `RNA`, or `AminoAcid`.
-"""
-function alphabet end
-
-"""
-    gap(typ)
-
-Return the gap symbol of `typ`.
-
-`typ` is one of `DNA`, `RNA`, `AminoAcid`, or `Char`.
-"""
-function gap end
+importall BioSymbols
 
 gap(::Type{Char}) = '-'
 
-include("nucleicacid.jl")
-include("aminoacid.jl")
 include("alphabet.jl")
 include("bitindex.jl")
 include("sequence.jl")
@@ -215,10 +214,13 @@ include("demultiplexer.jl")
 include("fasta/fasta.jl")
 include("fastq/fastq.jl")
 include("twobit/twobit.jl")
+include("abif/abif.jl")
 
 include("search/exact.jl")
 include("search/approx.jl")
 include("search/re.jl")
+
+include("minhash.jl")
 
 include("deprecated.jl")
 

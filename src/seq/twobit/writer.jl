@@ -1,6 +1,15 @@
 # 2bit Writer
 # ===========
 
+type Writer{T<:IO} <: Bio.IO.AbstractWriter
+    # output stream
+    output::T
+    # sequence names
+    names::Vector{String}
+    # bit vector to check if each sequence is already written or not
+    written::BitVector
+end
+
 """
     TwoBitWriter(output::IO, names::AbstractVector)
 
@@ -10,75 +19,61 @@ Create a data writer of the 2bit file format.
 * `output`: data sink
 * `names`: a vector of sequence names written to `output`
 """
-type TwoBitWriter{T<:IO} <: Bio.IO.AbstractWriter
-    # output stream
-    output::T
-
-    # sequence names
-    names::Vector{String}
-
-    # bit vector to check if each sequence is already written or not
-    written::BitVector
-end
-
-function TwoBitWriter(output::IO, names::AbstractVector)
-    writer = TwoBitWriter(output, names, falses(length(names)))
+function Writer(output::IO, names::AbstractVector)
+    writer = Writer(output, names, falses(length(names)))
     write_header(writer)
     write_index(writer)
     return writer
 end
 
-function Bio.IO.stream(writer::TwoBitWriter)
+function Bio.IO.stream(writer::Writer)
     return writer.output
 end
 
-function Base.close(writer::TwoBitWriter)
+function Base.close(writer::Writer)
     if !all(writer.written)
         error("one or more sequences are not written")
     end
     close(writer.output)
 end
 
-function write_header(writer::TwoBitWriter)
-    output = writer.output
+function write_header(writer::Writer)
     n = 0
-    n += write(output, 0x1A412743)
-    n += write(output, UInt32(0))
-    n += write(output, UInt32(length(writer.names)))
-    n += write(output, UInt32(0))
+    n += write(writer.output, SIGNATURE)
+    n += write(writer.output, UInt32(0))
+    n += write(writer.output, UInt32(length(writer.names)))
+    n += write(writer.output, UInt32(0))
     return n
 end
 
-function write_index(writer::TwoBitWriter)
-    output = writer.output
+function write_index(writer::Writer)
     n = 0
     for name in writer.names
-        n += write(output, UInt8(length(name)))
-        n += write(output, name)
-        n += write(output, UInt32(0))
+        n += write(writer.output, UInt8(length(name)))
+        n += write(writer.output, name)
+        n += write(writer.output, UInt32(0))  # filled later
     end
     return n
 end
 
 # Update the file offset of a sequence in the index section.
-function update_offset(writer::TwoBitWriter, seqname, seqoffset)
+function update_offset(writer::Writer, seqname, seqoffset)
     @assert seqname ∈ writer.names
-    output = writer.output
     offset = 16
     for name in writer.names
         offset += sizeof(UInt8) + length(name)
         if name == seqname
-            old = position(output)
-            seek(output, offset)
-            write(output, UInt32(seqoffset))
-            seek(output, old)
+            old = position(writer.output)
+            seek(writer.output, offset)
+            write(writer.output, UInt32(seqoffset))
+            seek(writer.output, old)
             return
         end
         offset += sizeof(UInt32)
     end
 end
 
-function Base.write(writer::TwoBitWriter, record::SeqRecord)
+function Base.write(writer::Writer, record::Bio.Seq.SeqRecord)
     i = findfirst(writer.names, record.name)
     if i == 0
         error("sequence \"", record.name, "\" doesn't exist in the writing list")
@@ -106,14 +101,14 @@ function make_n_blocks(seq)
     i = 1
     while i ≤ endof(seq)
         nt = seq[i]
-        if nt == DNA_N
+        if nt == Bio.Seq.DNA_N
             start = i - 1  # 0-based index
             push!(starts, start)
-            while i ≤ endof(seq) && seq[i] == DNA_N
+            while i ≤ endof(seq) && seq[i] == Bio.Seq.DNA_N
                 i += 1
             end
             push!(sizes, (i - 1) - start)
-        elseif isambiguous(nt)
+        elseif Bio.Seq.isambiguous(nt)
             error("ambiguous nucleotide except N is not supported")
         else
             i += 1
@@ -177,11 +172,11 @@ function write_twobit_sequence(output, seq)
     return n
 end
 
-function nuc2twobit(nt::DNA)
+function nuc2twobit(nt::Bio.Seq.DNA)
     return (
-        nt == DNA_A ? 0b10 :
-        nt == DNA_C ? 0b01 :
-        nt == DNA_G ? 0b11 :
-        nt == DNA_T ? 0b00 :
-        nt == DNA_N ? 0b00 : error())
+        nt == Bio.Seq.DNA_A ? 0b10 :
+        nt == Bio.Seq.DNA_C ? 0b01 :
+        nt == Bio.Seq.DNA_G ? 0b11 :
+        nt == Bio.Seq.DNA_T ? 0b00 :
+        nt == Bio.Seq.DNA_N ? 0b00 : error())
 end

@@ -1,5 +1,5 @@
-# Base Quality
-# ============
+# FASTQ Base Quality
+# ==================
 #
 # A representation of positions-specific integer quality scores, as in FASTQ.
 #
